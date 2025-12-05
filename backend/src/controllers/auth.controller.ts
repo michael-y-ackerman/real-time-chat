@@ -1,7 +1,12 @@
 import express, { type CookieOptions } from "express";
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
-import { generateToken } from "../lib/utils.js";
+import { generateToken, verifyToken } from "../lib/utils.js";
+import { Types } from "mongoose";
+import upload from "../lib/multerConfig.js";
+import { type Multer } from "multer";
+import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import s3Client from "../lib/s3Client.js";
 
 const register = async (req: express.Request, res: express.Response) => {
     const { email, fullName, password } = req.body;
@@ -46,7 +51,6 @@ const register = async (req: express.Request, res: express.Response) => {
     }
 };
 
-
 const login = async (req: express.Request, res: express.Response) => {
     const { email, password } = req.body;
     try {
@@ -90,4 +94,60 @@ const logout = (req: express.Request, res: express.Response) => {
     }
 };
 
-export { login, register, logout };
+interface MulterRequest extends express.Request {
+    user: { _id: Types.ObjectId };
+    file: Express.Multer.File & { location: string };
+}
+
+const updateAvatar = async (req: express.Request, res: express.Response) => {
+    try {
+        const multerReq = req as MulterRequest;
+        const s3Location = multerReq.file?.location;
+        const userId = multerReq.user._id;
+
+        if (!s3Location) {
+            return res.status(400).json({ message: "Profile picture upload failed or file missing." });
+        }
+
+        const currentUser = await User.findById(userId);
+        
+        if (currentUser?.avatar) {
+            try {
+                const oldAvatarUrl = currentUser.avatar;
+                const urlObj = new URL(oldAvatarUrl);
+                const oldKey = urlObj.pathname.substring(1);
+
+                await s3Client.send(new DeleteObjectCommand({
+                    Bucket: process.env.S3_BUCKET_NAME,
+                    Key: oldKey
+                }));
+                console.log(`Deleted old avatar: ${oldKey}`);
+            } catch (err) {
+                console.error("Failed to delete old avatar from S3:", err);
+                // Don't stop; just log the error
+            }
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId, 
+            { avatar: s3Location }, 
+            { new: true, select: "-password" }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        return res.status(200).json({
+            _id: updatedUser._id,
+            fullName: updatedUser.fullName,
+            email: updatedUser.email,
+            avatar: updatedUser.avatar, // The new S3 URL
+        });
+
+    } catch(error) {
+        console.log("Error in updateAvatar controller: ", (error as Error).message);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+export { login, register, logout, updateAvatar };

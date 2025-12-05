@@ -1,12 +1,17 @@
-import jwt, { type SignOptions } from "jsonwebtoken";
+import jwt, { type SignOptions, type JwtPayload } from "jsonwebtoken";
 import type { Response, CookieOptions } from "express";
 import { Types } from "mongoose";
 
 const DEFAULT_EXPIRES_IN = 24 * 60 * 60 * 1000; // 1 day in MS
 const DEFAULT_EXPIRATION_STRING = "1d";
+const DEFAULT_JWT_SECRET = "secret";
 
-export const generateToken = (userId: Types.ObjectId, res: Response) => {
-    const token = jwt.sign({ userId }, process.env.JWT_SECRET || "", {
+export interface AuthPayload extends JwtPayload {
+    userId: string;
+} 
+
+const generateToken = (userId: Types.ObjectId, res: Response) => {
+    const token = jwt.sign({ userId }, process.env.JWT_SECRET || DEFAULT_JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN || DEFAULT_EXPIRATION_STRING
     } as SignOptions);
 
@@ -19,3 +24,9 @@ export const generateToken = (userId: Types.ObjectId, res: Response) => {
     
     return token;
 };
+
+const verifyToken = (token: string): AuthPayload => {
+    return jwt.verify(token, process.env.JWT_SECRET || DEFAULT_JWT_SECRET) as AuthPayload;
+};
+
+export { generateToken, verifyToken };
