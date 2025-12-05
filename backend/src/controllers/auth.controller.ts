@@ -115,7 +115,7 @@ const updateAvatar = async (req: express.Request, res: express.Response) => {
             try {
                 const oldAvatarUrl = currentUser.avatar;
                 const urlObj = new URL(oldAvatarUrl);
-                const oldKey = urlObj.pathname.substring(1);
+                const oldKey = urlObj.pathname.substring(1); // Remove leading slash
 
                 await s3Client.send(new DeleteObjectCommand({
                     Bucket: process.env.S3_BUCKET_NAME,
@@ -150,4 +150,13 @@ const updateAvatar = async (req: express.Request, res: express.Response) => {
         return res.status(500).json({ message: "Internal server error" });
     }
 }
-export { login, register, logout, updateAvatar };
+
+const checkAuth = (req: express.Request, res: express.Response) => {
+    try {
+        res.status(200).json(req.user);
+    } catch(error) {
+        console.log("Error in checkAuth controller: ", (error as Error).message);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+export { login, register, logout, updateAvatar, checkAuth };
