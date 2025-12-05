@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { generateToken, verifyToken } from "../lib/utils.js";
 import { Types } from "mongoose";
 import upload from "../lib/multerConfig.js";
-import { type Multer } from "multer";
+import type { MulterRequest } from "../types/interface.js";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 import s3Client from "../lib/s3Client.js";
 
@@ -94,10 +94,6 @@ const logout = (req: express.Request, res: express.Response) => {
     }
 };
 
-interface MulterRequest extends express.Request {
-    user: { _id: Types.ObjectId };
-    file: Express.Multer.File & { location: string };
-}
 
 const updateAvatar = async (req: express.Request, res: express.Response) => {
     try {
